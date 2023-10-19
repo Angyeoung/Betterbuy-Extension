@@ -1,0 +1,24 @@
+- HTML Minifier: https://kangax.github.io/html-minifier
+
+COMPLETED:
+    [x] Switch to browser extension / Set up an easier build system
+    [x] Get searchbar + all categories working
+    [x] Make UI easier to use
+    [x] Status bar
+    [x] Staff pricing
+    [x] Fix formatting and appending rows
+    [x] Refactor code and setup
+    [x] Sorting
+    [x] Properly filter skus that aren't valid
+    [x] Add a remove button
+    [x] Pagination
+
+TODO:
+
+    
+    [ ] Stop getting banned
+    
+    [ ] Hide useless/sold out stuff (even better if useless staffPrice requests are skipped)
+    [ ] Add filters maybe (for subscriptions/memberships or other)
+    
+    [?] Add other categories and sub-categories

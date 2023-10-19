@@ -1,0 +1,20 @@
+{
+    "name": "BetterBuy",
+    "version": "0.1",
+    "manifest_version": 3,
+    
+    "content_scripts": [{
+        "matches": ["https://www.bestbuy.ca/*"],
+        "js": ["content-script.js"]
+    }],
+
+    "description": "A better way to view Best Buy employee discounts.",
+    "author": "Andrey Bolotin", 
+    "icons": {
+        "16": "images/betterbuy16x16.png",
+        "32": "images/betterbuy32x32.png",
+        "48": "images/betterbuy48x48.png",
+        "64": "images/betterbuy64x64.png",
+        "128": "images/betterbuy128x128.png"
+    }
+}
