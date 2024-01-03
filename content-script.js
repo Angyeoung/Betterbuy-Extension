@@ -289,14 +289,28 @@ class Progress {
     static progressBarEl;
 
     /** Percent should be 0-1 */
-    setProgress(percent) {
+    static setProgress(percent) {
         this.progressBarEl.style.width = Math.round(percent * 100) + "%";
     }
 }
 
 class Loading {
-    static uploadButton;
     static downloadButton;
+
+    static construct(downloadButton) {
+        this.downloadButton = downloadButton;
+        this.downloadButton.onclick = this.downloadCSV;
+    }
+
+    static downloadCSV() {
+        alert("CSV Broken, copy encoded URI in dev console");
+        let csvContent = "data:text/csv;charset=utf-8," 
+            + 'SKU,NAME,URL,REGULAR PRICE,SALE PRICE,PERCENT DISCOUNT,FLAT DISCOUNT\n'
+            + Table.data.map(row => [row.sku, row.name, row.url, row.regularPrice, row.staffPrice, percentDiscount(row.regularPrice, row.staffPrice), row.regularPrice - row.staffPrice].join(",")).join("\n");
+        let encodedUri = encodeURI(csvContent);
+        console.log(encodedUri);
+        window.open(encodedUri);
+    }
 }
 
 
@@ -312,6 +326,7 @@ async function start() {
     const searchAllButton = document.getElementById("searchAllButton");
     
     Progress.progressBarEl = document.getElementById("progressBar");
+    Loading.construct(document.getElementById("csvButton"));
     Table.construct(document.getElementById("table"));
     Pagination.construct(document.getElementById("pagination"), document.getElementById("paginationBottom"));
 
@@ -379,7 +394,7 @@ async function start() {
                     Table.render(1);
                     searchInProgress = false;
                 };
-                setProgress(pagesLeft > 0 ? (totalPages - pagesLeft)/totalPages : 0);
+                Progress.setProgress(pagesLeft > 0 ? (totalPages - pagesLeft)/totalPages : 0);
             }
         }
 
@@ -442,7 +457,7 @@ async function start() {
                     Table.render(1);
                     searchInProgress = false;
                 };
-                setProgress(pagesLeft > 0 ? (totalPages - pagesLeft)/totalPages : 0);
+                Progress.setProgress(pagesLeft > 0 ? (totalPages - pagesLeft)/totalPages : 0);
             }
         }
 
@@ -477,7 +492,7 @@ async function start() {
     document.body.prepend(tempButton);
 
     function replace() {
-        const miniHTML = `<!doctypehtml><html data-bs-theme=dark lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Document</title><link crossorigin=anonymous href=https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css integrity=sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN rel=stylesheet><style>body{margin:0;padding:0}#main{display:flex;flex-direction:column;padding-top:20vh;gap:20px;position:relative;height:100%;width:100%}img{width:50px}th{background-color:rgba(255,255,255,.1)}th:hover{cursor:pointer}ul{margin:0}li a{width:45px;text-align:center}li:not(.disabled):hover{cursor:pointer}</style><div id=main><div class="container text-center"id=title><h1>BetterBuy</h1></div><div class="container text-center d-flex"><div class="flex-grow-1 pe-1"><input class=form-control id=searchOption placeholder=Search></div><div class="flex-grow-1 px-1"><select class=form-select id=categoryOption><option selected>All Categories</select></div><div class=ps-1><button class="btn btn-primary"id=searchButton type=button>Search</button> <button class="btn btn-primary"id=searchAllButton type=button>Search All</button></div></div><div class=container><div class=progress><div class="progress-bar progress-bar-animated progress-bar-striped"id=progressBar style=width:0%></div></div></div><nav class=container><ul class=pagination id=pagination></ul></nav><div class=container><table class=table id=table><thead><tbody></table></div><nav class=container><ul class=pagination id=paginationBottom></ul></nav></div>`;
+        const miniHTML = `<!doctypehtml><html data-bs-theme=dark lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Document</title><link crossorigin=anonymous href=https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css integrity=sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN rel=stylesheet><style>body{margin:0;padding:0}#main{display:flex;flex-direction:column;padding-top:20vh;gap:20px;position:relative;height:100%;width:100%}img{width:50px}th{background-color:rgba(255,255,255,.1)}th:hover{cursor:pointer}ul{margin:0}li a{width:45px;text-align:center}li:not(.disabled):hover{cursor:pointer}</style><div id=main><div class="container text-center"id=title><h1>BetterBuy</h1></div><div class="container text-center d-flex"><div class="flex-grow-1 pe-1"><input class=form-control id=searchOption placeholder=Search></div><div class="flex-grow-1 px-1"><select class=form-select id=categoryOption><option selected>All Categories</select></div><div class=ps-1><button class="btn btn-primary"id=searchButton type=button>Search</button> <button class="btn btn-primary"id=searchAllButton type=button>Search All</button> <button class="btn btn-primary"id=csvButton type=button>CSV</button></div></div><div class=container><div class=progress><div class="progress-bar progress-bar-animated progress-bar-striped"id=progressBar style=width:0%></div></div></div><nav class=container><ul class=pagination id=pagination></ul></nav><div class=container><table class=table id=table><thead><tbody></table></div><nav class=container><ul class=pagination id=paginationBottom></ul></nav></div>`;
         document.open();
         document.write(miniHTML);
         start();
@@ -511,7 +526,7 @@ function trimName(name = "", length) {
 }
 
 function percentDiscount(regPrice, disPrice) {
-    if (regPrice === null || disPrice === null) return null;
+    if (regPrice === null || disPrice === null || regPrice == 0) return 0;
     return (regPrice - disPrice) / regPrice * 100;
 }
 
