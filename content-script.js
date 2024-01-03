@@ -115,7 +115,7 @@ class Table {
         regularPriceCell.innerText = toCAD(item.regularPrice);
         // Staff price cell
         let staffPriceCell = document.createElement("td");
-        staffPriceCell.innerText = item.staffPrice || "N/A";
+        staffPriceCell.innerText = toCAD(item.staffPrice);
         // Percent discount cell
         let percentDiscountCell = document.createElement("td");
         let pDisc = percentDiscountFormat(item.regularPrice, item.staffPrice);
@@ -190,9 +190,11 @@ class Table {
 class Pagination {
 
     static ulElement;
+    static ulElementBottom;
 
-    static construct(ulElement) {
+    static construct(ulElement, ulElementBottom) {
         this.ulElement = ulElement;
+        this.ulElementBottom = ulElementBottom;
     }
 
     static render(currentPage = 1, totalPages = 1) {
@@ -245,29 +247,59 @@ class Pagination {
     }
 
     static appendListElement(text, active, disabled, onclick = () => {}) {
-        let li = document.createElement("li");
-        let a = li.appendChild(document.createElement("a"));
-        li.className = disabled ? "page-item disabled" : active ? "page-item active" : "page-item";
-        li.onclick = onclick;
-        a.className = "page-link user-select-none";
-        a.innerText = text;
-        this.ulElement.append(li);
+        let liTop = document.createElement("li");
+        let liBot = document.createElement("li");
+        let aTop = liTop.appendChild(document.createElement("a"));
+        let aBot = liBot.appendChild(document.createElement("a"));
+        liTop.className = disabled ? "page-item disabled" : active ? "page-item active" : "page-item";
+        liTop.onclick = onclick;
+        liBot.className = disabled ? "page-item disabled" : active ? "page-item active" : "page-item";
+        liBot.onclick = onclick;
+        aTop.className = "page-link user-select-none";
+        aTop.innerText = text;
+        aBot.className = "page-link user-select-none";
+        aBot.innerText = text;
+        this.ulElement.append(liTop);
+        this.ulElementBottom.append(liBot);
     }
 
     static appendDots() {
-        let li = document.createElement("li");
-        let a = li.appendChild(document.createElement("a"));
-        li.className = "page-item disabled";
-        a.className = "page-link user-select-none";
-        a.innerText = "...";
-        this.ulElement.append(li);
+        let liTop = document.createElement("li");
+        let liBot = document.createElement("li");
+        let aTop = liTop.appendChild(document.createElement("a"));
+        let aBot = liBot.appendChild(document.createElement("a"));
+        liTop.className = "page-item disabled";
+        liBot.className = "page-item disabled";
+        aTop.className = "page-link user-select-none";
+        aTop.innerText = "...";
+        aBot.className = "page-link user-select-none";
+        aBot.innerText = "...";
+        this.ulElement.append(liTop);
+        this.ulElementBottom.append(liBot);
     }
 
     static clear() {
         this.ulElement.innerHTML = "";
+        this.ulElementBottom.innerHTML = "";
     }
 
 }
+
+class Progress {
+    static progressBarEl;
+
+    /** Percent should be 0-1 */
+    setProgress(percent) {
+        this.progressBarEl.style.width = Math.round(percent * 100) + "%";
+    }
+}
+
+class Loading {
+    static uploadButton;
+    static downloadButton;
+}
+
+
 
 ////////////////////////////////
 // The juice
@@ -277,11 +309,11 @@ async function start() {
     const searchOption = document.getElementById("searchOption");
     const categoryOption = document.getElementById("categoryOption");
     const searchButton = document.getElementById("searchButton");
-    const progressBar = document.getElementById("progressBar");
-    let searchInProgress = false;
-
+    const searchAllButton = document.getElementById("searchAllButton");
+    
+    Progress.progressBarEl = document.getElementById("progressBar");
     Table.construct(document.getElementById("table"));
-    Pagination.construct(document.getElementById("pagination"));
+    Pagination.construct(document.getElementById("pagination"), document.getElementById("paginationBottom"));
 
     setCategories();
 
@@ -290,11 +322,11 @@ async function start() {
         let currentId = (currentCategory == "All Categories") ? "" : categoryIds[currentCategory];
         search(currentId, searchOption.value);
     }
-    
-    /** Percent should be 0-1 */
-    function setProgress(percent) {
-        progressBar.style.width = Math.round(percent * 100) + "%";
+    searchAllButton.onclick = () => {
+        searchAll();
     }
+    
+    
 
     function setCategories() {
         Object.keys(categoryIds).forEach(c => {
@@ -310,8 +342,6 @@ async function start() {
     }
 
     async function search(id, query) {
-        if (searchInProgress) return alert("A search is already in progress.");
-        searchInProgress = true;
         let firstResponse = await get(links.search(id, 1, query));
         console.log("First Response:", firstResponse);
         let totalPages = firstResponse.totalPages;
@@ -320,7 +350,7 @@ async function start() {
         
         Pagination.clear();
         Table.clearAll();
-        setProgress(0.02);
+        Progress.setProgress(0.02);
 
         // Loop over all pages
         for (let page = 1; page <= totalPages; page++) {
@@ -354,14 +384,75 @@ async function start() {
         }
 
         function pushToData(searchResponse, staffPriceResponse) {
-            // let products = exSearchProducts;
-            // let detailList = exStaffPriceDetailList;
             let products = searchResponse.products;
             let detailList = staffPriceResponse ? staffPriceResponse.staffPriceDetailList : null;
 
             products.forEach(product => {
                 let detail = detailList ? detailList.find(s => s.sku == sku) : null;
-                let staffPrice = (detail && detail.spAllowed != "Y") ? Math.round(detail.staffPrice) : null;
+                let staffPrice = (detail && detail.spAllowed != "Y") ? Math.round(detail.staffPrice) : Math.round(product.salePrice);
+                let itemObject = {
+                    name: product.name,
+                    sku: product.sku,
+                    img: product.thumbnailImage,
+                    url: "https://bestbuy.ca" + product.productUrl,
+                    regularPrice: Math.round(product.salePrice),
+                    staffPrice: staffPrice,
+                };
+                Table.data.push(itemObject);
+            });
+        }
+    }
+
+    async function searchAll() {
+        let firstResponse = await get(links.search("", 1));
+        console.log("First Response:", firstResponse);
+        let totalPages = firstResponse.totalPages;
+        let pagesLeft = totalPages;
+        alert("Starting slow search of " + totalPages + " pages.");
+        
+        Pagination.clear();
+        Table.clearAll();
+        Progress.setProgress(0.02);
+
+        // Loop over all pages (slowly)
+        for (let page = 1; page <= totalPages; page++) {
+            let searchResponse = await get(links.search("", page));
+            processSearchResponse(searchResponse);
+        }
+
+        async function processSearchResponse(searchResponse = exSearchResponse) {
+            let staffPrice = await getStaffPrice();
+            pushToData(searchResponse, staffPrice);
+            pagesLeft--;
+            updateProgress();
+            
+            function extractValidSkus(response = exSearchResponse) {
+                return response.products
+                    .filter(product => product.sku.length && product.sku[0] != "B")
+                    .map(product => product.sku);
+            }
+
+            async function getStaffPrice() {
+                return await get(links.staffPrice(extractValidSkus(searchResponse)));
+            }
+
+            function updateProgress() {
+                console.log(`Loading page ${searchResponse.currentPage}/${totalPages}. ${pagesLeft} remaining.`);
+                if (pagesLeft <= 0) {
+                    Table.render(1);
+                    searchInProgress = false;
+                };
+                setProgress(pagesLeft > 0 ? (totalPages - pagesLeft)/totalPages : 0);
+            }
+        }
+
+        function pushToData(searchResponse, staffPriceResponse) {
+            let products = searchResponse.products;
+            let detailList = staffPriceResponse ? staffPriceResponse.staffPriceDetailList : null;
+
+            products.forEach(product => {
+                let detail = detailList ? detailList.find(s => s.sku == sku) : null;
+                let staffPrice = (detail && detail.spAllowed != "Y") ? Math.round(detail.staffPrice) : Math.round(product.salePrice);
                 let itemObject = {
                     name: product.name,
                     sku: product.sku,
@@ -386,12 +477,21 @@ async function start() {
     document.body.prepend(tempButton);
 
     function replace() {
-        const miniHTML = `<!doctypehtml><html data-bs-theme=dark lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Document</title><link crossorigin=anonymous href=https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css integrity=sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN rel=stylesheet><style>body{margin:0;padding:0}#main{display:flex;flex-direction:column;padding-top:20vh;gap:20px;position:relative;height:100%;width:100%}img{width:50px}th{background-color:rgba(255,255,255,.1)}th:hover{cursor:pointer}ul{margin:0}li a{width:45px;text-align:center}li:not(.disabled):hover{cursor:pointer}</style><div id=main><div class="container text-center"id=title><h1>BetterBuy</h1></div><div class="container text-center d-flex"><div class="flex-grow-1 pe-1"><input class=form-control id=searchOption placeholder=Search></div><div class="flex-grow-1 px-1"><select class=form-select id=categoryOption><option selected>All Categories</select></div><div class=ps-1><button class="btn btn-primary"id=searchButton type=button>Search</button></div></div><div class=container><div class=progress><div class="progress-bar progress-bar-animated progress-bar-striped"id=progressBar style=width:0%></div></div></div><nav class=container><ul class=pagination id=pagination></ul></nav><div class=container><table class=table id=table><thead><tbody></table></div></div>`;
+        const miniHTML = `<!doctypehtml><html data-bs-theme=dark lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Document</title><link crossorigin=anonymous href=https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css integrity=sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN rel=stylesheet><style>body{margin:0;padding:0}#main{display:flex;flex-direction:column;padding-top:20vh;gap:20px;position:relative;height:100%;width:100%}img{width:50px}th{background-color:rgba(255,255,255,.1)}th:hover{cursor:pointer}ul{margin:0}li a{width:45px;text-align:center}li:not(.disabled):hover{cursor:pointer}</style><div id=main><div class="container text-center"id=title><h1>BetterBuy</h1></div><div class="container text-center d-flex"><div class="flex-grow-1 pe-1"><input class=form-control id=searchOption placeholder=Search></div><div class="flex-grow-1 px-1"><select class=form-select id=categoryOption><option selected>All Categories</select></div><div class=ps-1><button class="btn btn-primary"id=searchButton type=button>Search</button> <button class="btn btn-primary"id=searchAllButton type=button>Search All</button></div></div><div class=container><div class=progress><div class="progress-bar progress-bar-animated progress-bar-striped"id=progressBar style=width:0%></div></div></div><nav class=container><ul class=pagination id=pagination></ul></nav><div class=container><table class=table id=table><thead><tbody></table></div><nav class=container><ul class=pagination id=paginationBottom></ul></nav></div>`;
         document.open();
         document.write(miniHTML);
         start();
     }
 })();
+
+
+
+
+
+
+
+
+
 
 ////////////////////////////////
 // Random Helpers

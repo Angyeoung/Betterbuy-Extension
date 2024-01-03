@@ -14,11 +14,8 @@ COMPLETED:
     [x] Pagination
 
 TODO:
-
-    
+    [ ] Regular web page stuff
     [ ] Stop getting banned
-    
     [ ] Hide useless/sold out stuff (even better if useless staffPrice requests are skipped)
     [ ] Add filters maybe (for subscriptions/memberships or other)
-    
     [?] Add other categories and sub-categories
