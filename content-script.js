@@ -2,32 +2,6 @@
 // Classes and constants
 ////////////////////////////////
 
-/** Categories and Ids */
-const categoryIds = {
-    "Computers & Tablets": "20001",
-    "Best Buy Mobile": "20006",
-    "Office Supplies & Ink": "30957",
-    "TV & Home Theatre": "20003",
-    "Audio": "659699",
-    "Cameras, Camcorders & Drones": "20005",
-    "Car Electronics and GPS": "20004",
-    "Appliances": "26517",
-    "Smart Home": "30438",
-    "Home Living": "homegardentools",
-    "Baby & Maternity": "881392",
-    "Video Games": "26516",
-    "Wearable Technology": "34444",
-    "Health & Fitness": "882185",
-    "Sports, Recreation & Transportation": "sportsrecreation",
-    "Movies & Music": "20002",
-    "Musical Instruments & Equipment": "20343",
-    "Toys, Games & Education": "21361",
-    "Beauty": "882187",
-    "Personal Care": "882186",
-    "Travel, Luggage & Bags": "31698",
-    "Fashion, Watches & Jewelry": "10159983",
-    "Gift Cards": "blta5578c9ddd209cd8"
-};
 /** Useful links */
 const links = {
     /** Random Test API */
@@ -53,6 +27,17 @@ const links = {
     )}
 };
 
+// TODO: Used for storing and mutating data array
+class Data {
+    static data = [];
+
+    static add() {
+
+    }
+
+}
+
+// Used for altering the HTML table
 class Table {
 
     // data = [exItemObject];
@@ -187,6 +172,7 @@ class Table {
 
 }
 
+// Pagination bar
 class Pagination {
 
     static ulElement;
@@ -285,6 +271,7 @@ class Pagination {
 
 }
 
+// Progress bar
 class Progress {
     static progressBarEl;
 
@@ -294,6 +281,7 @@ class Progress {
     }
 }
 
+// Used for downloading and possibly uploading in the future
 class Loading {
     static downloadButton;
 
@@ -314,6 +302,58 @@ class Loading {
     }
 }
 
+// Used for the search bar and category option bar
+class Options {
+
+    static searchOption;
+    static categoryOption;
+    static categoryIds = {
+        "Computers & Tablets": "20001",
+        "Best Buy Mobile": "20006",
+        "Office Supplies & Ink": "30957",
+        "TV & Home Theatre": "20003",
+        "Audio": "659699",
+        "Cameras, Camcorders & Drones": "20005",
+        "Car Electronics and GPS": "20004",
+        "Appliances": "26517",
+        "Smart Home": "30438",
+        "Home Living": "homegardentools",
+        "Baby & Maternity": "881392",
+        "Video Games": "26516",
+        "Wearable Technology": "34444",
+        "Health & Fitness": "882185",
+        "Sports, Recreation & Transportation": "sportsrecreation",
+        "Movies & Music": "20002",
+        "Musical Instruments & Equipment": "20343",
+        "Toys, Games & Education": "21361",
+        "Beauty": "882187",
+        "Personal Care": "882186",
+        "Travel, Luggage & Bags": "31698",
+        "Fashion, Watches & Jewelry": "10159983",
+        "Gift Cards": "blta5578c9ddd209cd8"
+    }
+
+    static construct(searchOption, categoryOption) {
+        this.searchOption = searchOption;
+        this.categoryOption = categoryOption;
+        this.setCategories();
+    }
+
+    static setCategories() {
+        Object.keys(this.categoryIds).forEach(c => {
+            let el = document.createElement("option");
+            el.innerText = c;
+            el.value = c;
+            this.categoryOption.appendChild(el);
+        });
+    }
+
+    static getID(categoryName) { return this.categoryIds[categoryName]; }
+
+    static get currentCategory() { return this.categoryOption.value; }
+    static get currentID() { return (this.currentCategory == "All Categories") ? "" : this.getID(this.currentCategory); }
+    static get searchQuery() { return this.searchOption.value; }
+}
 
 
 ////////////////////////////////
@@ -321,37 +361,22 @@ class Loading {
 ////////////////////////////////
 
 async function start() {
-    const searchOption = document.getElementById("searchOption");
-    const categoryOption = document.getElementById("categoryOption");
     const searchButton = document.getElementById("searchButton");
     const searchAllButton = document.getElementById("searchAllButton");
     
     Progress.progressBarEl = document.getElementById("progressBar");
+    Options.construct(document.getElementById("searchOption"), document.getElementById("categoryOption"));
     Loading.construct(document.getElementById("csvButton"));
     Table.construct(document.getElementById("table"));
     Pagination.construct(document.getElementById("pagination"), document.getElementById("paginationBottom"));
 
-    setCategories();
-
     searchButton.onclick = () => {
-        let currentCategory = categoryOption.value;
-        let currentId = (currentCategory == "All Categories") ? "" : categoryIds[currentCategory];
-        search(currentId, searchOption.value);
+        search(Options.currentID, Options.searchQuery);
     }
     searchAllButton.onclick = () => {
         searchAll();
     }
     
-    
-
-    function setCategories() {
-        Object.keys(categoryIds).forEach(c => {
-            let el = document.createElement("option");
-            el.innerText = c;
-            el.value = c;
-            categoryOption.appendChild(el);
-        });
-    }
 
     async function get(url) {
         return await fetch(url).then(r => r.json(), err => {console.log(err); return null});
