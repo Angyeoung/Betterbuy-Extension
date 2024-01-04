@@ -299,17 +299,18 @@ class Loading {
 
     static construct(downloadButton) {
         this.downloadButton = downloadButton;
-        this.downloadButton.onclick = this.downloadCSV;
+        this.downloadButton.onclick = this.download;
     }
 
-    static downloadCSV() {
-        alert("CSV Broken, copy encoded URI in dev console");
-        let csvContent = "data:text/csv;charset=utf-8," 
-            + 'SKU,NAME,URL,REGULAR PRICE,SALE PRICE,PERCENT DISCOUNT,FLAT DISCOUNT\n'
-            + Table.data.map(row => [row.sku, row.name, row.url, row.regularPrice, row.staffPrice, percentDiscount(row.regularPrice, row.staffPrice), row.regularPrice - row.staffPrice].join(",")).join("\n");
-        let encodedUri = encodeURI(csvContent);
-        console.log(encodedUri);
-        window.open(encodedUri);
+    static download() { 
+        // Replace this later with formatted data
+        const data = "1,2,3\n4,5,6";
+        const blob = new Blob([data], { type: 'text/csv' }); 
+        const url = window.URL.createObjectURL(blob) 
+        const a = document.createElement('a') 
+        a.setAttribute('href', url) 
+        a.setAttribute('download', 'download.csv');
+        a.click() 
     }
 }
 
