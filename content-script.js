@@ -27,6 +27,10 @@ const links = {
     )}
 };
 
+async function get(url) {
+    return await fetch(url).then(r => r.json(), err => {console.log(err); return null});
+}
+
 // TODO: Used for storing and mutating data array
 class Data {
     static data = [];
@@ -355,6 +359,16 @@ class Options {
     static get searchQuery() { return this.searchOption.value; }
 }
 
+// Used for searching and stuff
+class Search {
+    
+    static searchInProgress = false;
+
+    static async search(id, query) {
+
+    }
+
+}
 
 ////////////////////////////////
 // The juice
@@ -374,13 +388,11 @@ async function start() {
         search(Options.currentID, Options.searchQuery);
     }
     searchAllButton.onclick = () => {
-        searchAll();
+        console.log();
     }
     
 
-    async function get(url) {
-        return await fetch(url).then(r => r.json(), err => {console.log(err); return null});
-    }
+    
 
     async function search(id, query) {
         let firstResponse = await get(links.search(id, 1, query));
@@ -410,72 +422,7 @@ async function start() {
                     .map(product => product.sku);
             }
 
-            async function getStaffPrice() {
-                return await get(links.staffPrice(extractValidSkus(searchResponse)));
-            }
-
-            function updateProgress() {
-                console.log(`Loading page ${searchResponse.currentPage}/${totalPages}. ${pagesLeft} remaining.`);
-                if (pagesLeft <= 0) {
-                    Table.render(1);
-                    searchInProgress = false;
-                };
-                Progress.setProgress(pagesLeft > 0 ? (totalPages - pagesLeft)/totalPages : 0);
-            }
-        }
-
-        function pushToData(searchResponse, staffPriceResponse) {
-            let products = searchResponse.products;
-            let detailList = staffPriceResponse ? staffPriceResponse.staffPriceDetailList : null;
-
-            products.forEach(product => {
-                let detail = detailList ? detailList.find(s => s.sku == sku) : null;
-                let staffPrice = (detail && detail.spAllowed != "Y") ? Math.round(detail.staffPrice) : Math.round(product.salePrice);
-                let itemObject = {
-                    name: product.name,
-                    sku: product.sku,
-                    img: product.thumbnailImage,
-                    url: "https://bestbuy.ca" + product.productUrl,
-                    regularPrice: Math.round(product.salePrice),
-                    staffPrice: staffPrice,
-                };
-                Table.data.push(itemObject);
-            });
-        }
-    }
-
-    async function searchAll() {
-        let firstResponse = await get(links.search("", 1));
-        console.log("First Response:", firstResponse);
-        let totalPages = firstResponse.totalPages;
-        let pagesLeft = totalPages;
-        alert("Starting slow search of " + totalPages + " pages.");
-        
-        Pagination.clear();
-        Table.clearAll();
-        Progress.setProgress(0.02);
-
-        // Loop over all pages (slowly)
-        for (let page = 1; page <= totalPages; page++) {
-            let searchResponse = await get(links.search("", page));
-            processSearchResponse(searchResponse);
-        }
-
-        async function processSearchResponse(searchResponse = exSearchResponse) {
-            let staffPrice = await getStaffPrice();
-            pushToData(searchResponse, staffPrice);
-            pagesLeft--;
-            updateProgress();
             
-            function extractValidSkus(response = exSearchResponse) {
-                return response.products
-                    .filter(product => product.sku.length && product.sku[0] != "B")
-                    .map(product => product.sku);
-            }
-
-            async function getStaffPrice() {
-                return await get(links.staffPrice(extractValidSkus(searchResponse)));
-            }
 
             function updateProgress() {
                 console.log(`Loading page ${searchResponse.currentPage}/${totalPages}. ${pagesLeft} remaining.`);
@@ -560,6 +507,10 @@ function percentDiscountFormat(regPrice, disPrice) {
     if (regPrice === null || disPrice === null) return null;
     return `-${percentDiscount(regPrice, disPrice).toFixed(1)}%`;
 }
+
+
+
+
 
 let exSearchProducts = [
     {
