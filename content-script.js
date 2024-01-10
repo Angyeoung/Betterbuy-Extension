@@ -31,11 +31,41 @@ async function get(url) {
     return await fetch(url).then(r => r.json(), err => {console.log(err); return null});
 }
 
+// Helpers
+class H {
+    /** Converts a number `n` into CAD currency string */
+    static toCAD(n) {
+        return Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(n);
+    }
+
+    /** Trims `name` to some `length` with `...` appended afterwards */
+    static trimName(name = "", length) {
+        if (name.length > length)
+            return name.substring(0, length) + "...";
+        return name;
+    }
+
+    /** Gives the % discount between `regularPrice` and `discountPrice` as a number */
+    static percentDiscount(regularPrice, discountPrice) {
+        if (regularPrice === null || discountPrice === null || regularPrice == 0) return 0;
+        return (regularPrice - discountPrice) / regularPrice * 100;
+    }
+    
+    /** Gives the % discount between `regularPrice` and `discountPrice` as a formatted string (`"-x.x%"`) */
+    static percentDiscountFormat(regularPrice, discountPrice) {
+        if (regularPrice === null || discountPrice === null) return null;
+        return `-${this.percentDiscount(regularPrice, discountPrice).toFixed(1)}%`;
+    }
+}
+
 // TODO: Used for storing and mutating data array
 class Data {
     static data = [];
 
-    static add() {
+    static add(url, ) {
 
     }
 
@@ -101,17 +131,17 @@ class Table {
         nameCell.append(nameLink);
         // Regular price cell
         let regularPriceCell = document.createElement("td");
-        regularPriceCell.innerText = toCAD(item.regularPrice);
+        regularPriceCell.innerText = H.toCAD(item.regularPrice);
         // Staff price cell
         let staffPriceCell = document.createElement("td");
-        staffPriceCell.innerText = toCAD(item.staffPrice);
+        staffPriceCell.innerText = H.toCAD(item.staffPrice);
         // Percent discount cell
         let percentDiscountCell = document.createElement("td");
-        let pDisc = percentDiscountFormat(item.regularPrice, item.staffPrice);
+        let pDisc = H.percentDiscountFormat(item.regularPrice, item.staffPrice);
         percentDiscountCell.innerText = item.staffPrice ? pDisc : "N/A";
         // Flat discount cell
         let flatDiscountCell = document.createElement("td");
-        flatDiscountCell.innerText = item.staffPrice ? toCAD(item.regularPrice - item.staffPrice) : "N/A";
+        flatDiscountCell.innerText = item.staffPrice ? H.toCAD(item.regularPrice - item.staffPrice) : "N/A";
         // Delete button
         let deleteButtonCell = document.createElement("td");
         let deleteButton = document.createElement("button");
@@ -150,7 +180,7 @@ class Table {
         // Discount (%)
         else if (index == 4) {
             this.curSortIndex = 4;
-            this.data.sort((a, b) => percentDiscount(b.regularPrice, b.staffPrice) - percentDiscount(a.regularPrice, a.staffPrice));
+            this.data.sort((a, b) => H.percentDiscount(b.regularPrice, b.staffPrice) - H.percentDiscount(a.regularPrice, a.staffPrice));
         }
         // Discount ($)
         else if (index == 5) {
@@ -485,28 +515,11 @@ async function start() {
 // Random Helpers
 ////////////////////////////////
 
-function toCAD(n) {
-    return Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-    }).format(n);
-}
 
-function trimName(name = "", length) {
-    if (name.length > length)
-        return name.substring(0, length) + "...";
-    return name;
-}
 
-function percentDiscount(regPrice, disPrice) {
-    if (regPrice === null || disPrice === null || regPrice == 0) return 0;
-    return (regPrice - disPrice) / regPrice * 100;
-}
 
-function percentDiscountFormat(regPrice, disPrice) {
-    if (regPrice === null || disPrice === null) return null;
-    return `-${percentDiscount(regPrice, disPrice).toFixed(1)}%`;
-}
+
+
 
 
 
