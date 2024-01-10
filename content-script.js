@@ -53,9 +53,9 @@ class H {
         return name;
     }
 
-    /** Gives the % discount between `regularPrice` and `discountPrice` as a number */
-    static percentDiscount(regularPrice, discountPrice) {
-        if (regularPrice === null || discountPrice === null || regularPrice == 0) return 0;
+    /** Gives the % discount between `regularPrice` and `discountPrice` as a number (0-100) */
+    static percentDiscount(regularPrice = 0, discountPrice = 0) {
+        if (!(regularPrice && discountPrice)) return 0;
         return (regularPrice - discountPrice) / regularPrice * 100;
     }
     
@@ -74,21 +74,23 @@ class H {
     }
 }
 
-// TODO: Used for storing and mutating data array
+// Used for storing and mutating data array
 class Data {
-    static data = [];
+    /** @type {exItemObject} */
+    static array = [];
 
-    static add(url, ) {
-
+    /** 
+     * Add an item to the data array 
+     * @param {exItemObject} itemObject
+     */
+    static addItem(itemObject) {
+        this.array.push(itemObject);
     }
 
 }
 
 // Used for altering the HTML table
 class Table {
-
-    // data = [exItemObject];
-    static data = [];
     static curSortIndex = 0;
     static tBody;
     static tHead;
@@ -96,28 +98,27 @@ class Table {
     static construct(table = new HTMLTableElement()) {
         this.tBody = table.tBodies.item(0);
         this.tHead = table.tHead;
-        this.data = [];
         this.addHeaders();
     }
 
     static render(page) {
         this.clearBody();
 
-        let totalPages = Math.ceil(this.data.length / 100);
+        let totalPages = Math.ceil(Data.array.length / 100);
         if (page > totalPages) return console.error("Invalid page number: " + page);
         if (totalPages == 0) return console.log("No data to load");
 
         Pagination.render(page, totalPages);
 
         // Render the first 100 elements of this page
-        let elementsOnThisPage = (this.data.length < page * 100) ? this.data.length - (page - 1) * 100 : 100;
+        let elementsOnThisPage = (Data.array.length < page * 100) ? Data.array.length - (page - 1) * 100 : 100;
         let startIndex = (page - 1) * 100;
-        let itemsOnThisPage = this.data.slice(startIndex, startIndex + elementsOnThisPage);
+        let itemsOnThisPage = Data.array.slice(startIndex, startIndex + elementsOnThisPage);
         itemsOnThisPage.forEach(item => this.tBody.append(this.formatRow(item)));
     }
 
     static clearAll() {
-        this.data = [];
+        Data.array = [];
         this.curSortIndex = 0;
         this.clearBody();
     }
@@ -182,25 +183,25 @@ class Table {
         // Regular Price
         if (index == 2) {
             this.curSortIndex = 2;
-            this.data.sort((a, b) => b.regularPrice - a.regularPrice);
+            Data.array.sort((a, b) => b.regularPrice - a.regularPrice);
         }
         // Staff Price
         else if (index == 3) {
             this.curSortIndex = 3;
-            this.data.sort((a, b) => b.staffPrice - a.staffPrice);
+            Data.array.sort((a, b) => b.staffPrice - a.staffPrice);
         }
         // Discount (%)
         else if (index == 4) {
             this.curSortIndex = 4;
-            this.data.sort((a, b) => H.percentDiscount(b.regularPrice, b.staffPrice) - H.percentDiscount(a.regularPrice, a.staffPrice));
+            Data.array.sort((a, b) => H.percentDiscount(b.regularPrice, b.staffPrice) - H.percentDiscount(a.regularPrice, a.staffPrice));
         }
         // Discount ($)
         else if (index == 5) {
             this.curSortIndex = 5;
-            this.data.sort((a, b) => (b.regularPrice - b.staffPrice) - (a.regularPrice - a.staffPrice));
+            Data.array.sort((a, b) => (b.regularPrice - b.staffPrice) - (a.regularPrice - a.staffPrice));
         }
         else return;
-        console.log(this.data);
+        console.log(Data.array);
         this.render(1);
     }
 
@@ -403,8 +404,9 @@ class Search {
     
     static searchInProgress = false;
 
-    /** Starts a normal search, formatting and adding entries to data, then rendering them in the table */
+    /** TODO: Starts a normal search, formatting and adding entries to data, then rendering them in the table */
     static async startNormalSearch(id, query) {
+        this.searchInProgress = true;
         let firstResponse = await this.productSearch(id, 1, query);
         console.log("First Response:", firstResponse);
         let totalPages = firstResponse.totalPages;
@@ -420,8 +422,13 @@ class Search {
 
         // Loop over all pages
         for (let page = 1; page <= totalPages; page++) {
-            get(links.search(id, page, query)).then(processSearchResponse);
+            // Do the combined search
+            this.combinedSearch(id, page, query).then(
+                r => this.pushToData(r.search, r.staffPrice),
+                () => console.error("Error @ combinedSearch(): combinedSearch() failed")
+            );
         }
+        this.searchInProgress = false;
     }
 
     /** Requests both a product search and a staffPrice search, returns a combined object */
@@ -430,12 +437,12 @@ class Search {
         let searchResponse = await this.productSearch(id, pageNumber, query);
         
         // Return error if it's nullish
-        if (!searchResponse) return console.log("Error @ combinedSearchToData(): Search response failed and returned null");
+        if (!searchResponse) return console.error("Error @ combinedSearch(): Search response failed and returned null");
         
         // Extract SKUs
         let skus = H.extractValidSkus(searchResponse);
 
-        if (!skus.length) return console.log("Error @ combinedSearchToData(): Extracted Skus array has length 0");
+        if (!skus.length) return console.error("Error @ combinedSearch(): Extracted Skus array has length 0");
 
         // Get staff price response
         let staffPriceResponse = await this.staffPriceSearch(skus);
@@ -456,14 +463,38 @@ class Search {
         return await get(links.staffPrice(skus));
     }
 
-    // Get the first response for page count
-    // Get the total page count
-    // For every page:
-        // Get the search response
-        // Extract skus
-        // Get the staff price response
-        // If succeeded, add it
-        // If failed, print something in console
+    /** Takes a searchResponse and staffPriceResponse, formats it, and pushes it to data */
+    static pushToData(searchResponse = exSearchResponse, staffPriceResponse = exStaffPriceResponse) {
+        if (!searchResponse) return console.error("Error @ pushToData(): searchResponse failed");
+        if (!staffPriceResponse) console.warn("Warning @ pushToData(): Staff price response failed for searchResponse:", searchResponse);
+        
+        let products = searchResponse.products;
+        let detailList = staffPriceResponse?.staffPriceDetailList;
+
+        products.forEach(product => {
+            const name = product.name;
+            const staffPrice = product.salePrice;
+            const percentDiscount = 0;
+            const flatDiscount = 0;
+            if (detailList) {
+                const detail = detailList.find(s => s.sku == product.sku);
+                staffPrice = (detail.spAllowed == "Y") ? detail.staffPrice : product.salePrice;
+                percentDiscount = H.percentDiscount(product.salePrice, staffPrice);
+                flatDiscount = product.salePrice - staffPrice;
+                name = detail.skuDesc;
+            }
+            Data.addItem({
+                name: name,
+                sku: product.sku,
+                img: product.thumbnailImage,
+                url: "https://bestbuy.ca" + product.productUrl,
+                regularPrice: product.salePrice,
+                staffPrice: staffPrice,
+                percentDiscount: percentDiscount,
+                flatDiscount: flatDiscount
+            });
+        });
+    }
 
 }
 
@@ -496,39 +527,9 @@ class PageManager {
 // The juice
 ////////////////////////////////
 
-async function start() {
-    
-    PageManager.constructPage();
-
-    async function search(id, query) {
-
-
-        
-
-        function pushToData(searchResponse, staffPriceResponse) {
-            let products = searchResponse.products;
-            let detailList = staffPriceResponse?.staffPriceDetailList;
-
-            products.forEach(product => {
-                let detail = detailList?.find(s => s.sku == sku);
-                let staffPrice = (detail && detail.spAllowed != "Y") ? Math.round(detail.staffPrice) : Math.round(product.salePrice);
-                let itemObject = {
-                    name: product.name,
-                    sku: product.sku,
-                    img: product.thumbnailImage,
-                    url: "https://bestbuy.ca" + product.productUrl,
-                    regularPrice: Math.round(product.salePrice),
-                    staffPrice: staffPrice,
-                };
-                Table.data.push(itemObject);
-            });
-        }
-    }
-
-}
 
 function test() {
-
+    console.log("Test Function");
 }
 
 (function setup() {
@@ -543,7 +544,8 @@ function test() {
         const miniHTML = `<!doctypehtml><html data-bs-theme=dark lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Document</title><link crossorigin=anonymous href=https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css integrity=sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN rel=stylesheet><style>body{margin:0;padding:0}#main{display:flex;flex-direction:column;padding-top:20vh;gap:20px;position:relative;height:100%;width:100%}img{width:50px}th{background-color:rgba(255,255,255,.1)}th:hover{cursor:pointer}ul{margin:0}li a{width:45px;text-align:center}li:not(.disabled):hover{cursor:pointer}</style><div id=main><div class="container text-center"id=title><h1>BetterBuy</h1></div><div class="container text-center d-flex"><div class="flex-grow-1 pe-1"><input class=form-control id=searchOption placeholder=Search></div><div class="flex-grow-1 px-1"><select class=form-select id=categoryOption><option selected>All Categories</select></div><div class=ps-1><button class="btn btn-primary"id=searchButton type=button>Search</button> <button class="btn btn-primary"id=searchAllButton type=button>Search All</button> <button class="btn btn-primary"id=csvButton type=button>CSV</button></div></div><div class=container><div class=progress><div class="progress-bar progress-bar-animated progress-bar-striped"id=progressBar style=width:0%></div></div></div><nav class=container><ul class=pagination id=pagination></ul></nav><div class=container><table class=table id=table><thead><tbody></table></div><nav class=container><ul class=pagination id=paginationBottom></ul></nav></div>`;
         document.open();
         document.write(miniHTML);
-        start();
+        PageManager.constructPage();
+        test();
     }
 })();
 
@@ -591,6 +593,42 @@ let exSearchResponse = {
     "productStatusCode": "200",
 };
 
+let exStaffPriceResponse = {
+    "records": 2,
+    "staffPriceDetailList": [
+        {
+            "sku": 16948057,
+            "store": 900,
+            "avCost": 975.2098,
+            "dept": 15,
+            "class1": 5,
+            "subclass": 3,
+            "currentPrice": 999.99,
+            "skuType": "MERCH",
+            "spAllowed": "Y",
+            "skuDesc": "LENOVO 82YL0046CF I5-1335U/16/512/14T",
+            "staffPrice": 999.99,
+            "remark": "Current price < Staff Price.",
+            "image": "https://multimedia.bbycastatic.ca/multimedia/products/300x300/169/16948/16948057.jpg"
+        },
+        {
+            "sku": 17166716,
+            "store": 900,
+            "avCost": 415.6886,
+            "dept": 31,
+            "class1": 6,
+            "subclass": 1,
+            "currentPrice": 489.99,
+            "skuType": "MERCH",
+            "spAllowed": "Y",
+            "skuDesc": "SAMSUNG GW6 CLASSIC 47MM BT BLACK",
+            "staffPrice": 436.47,
+            "remark": "Regular Staff Price. Cost plus 5%.",
+            "image": "https://multimedia.bbycastatic.ca/multimedia/products/300x300/171/17166/17166716.jpg"
+        }
+    ]
+}
+
 // response.staffPriceDetailList
 let exStaffPriceDetailList = [
     {
@@ -626,4 +664,6 @@ let exItemObject = {
     url: "https://bestbuy.ca/en-ca/product/open-box-sony-65-4k-uhd-hdr-led-smart-google-tv-xr65x90l-2023/17222124",
     regularPrice: 100.00,
     staffPrice: 50.00 || null,
+    percentDiscount: 50.00,
+    flatDiscount: 50.00
 };
