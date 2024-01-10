@@ -11,6 +11,7 @@ const links = {
     /** Should return an object full of category info */
     categories: "https://www.bestbuy.ca/api/merch/v2/menus/header/blted928bb7b8e6c7f8-g1?lang=en-ca",
     staffPriceBase: "https://staffprice-app-hr-staffprice-prod.apps.prod-ocp-corp.ca.bestbuy.com/bizdm/api/staffprice/skus/",
+    /** Takes an array of skus (array of strings and/or numbers) and returns a requestable staff price link */
     staffPrice(skus = [""]) { return this.staffPriceBase + skus.join(","); },
     // https://stackoverflow.com/questions/1714786/query-string-encoding-of-a-javascript-object
     search(id, pageNumber, query = "") { return (
@@ -27,6 +28,10 @@ const links = {
     )}
 };
 
+/** 
+ * @param {string} url - the url to send get request to
+ * @returns {Promise<JSON | null>} - Response as JSON object or null
+ */
 async function get(url) {
     return await fetch(url).then(r => r.json(), err => {console.log(err); return null});
 }
@@ -58,6 +63,14 @@ class H {
     static percentDiscountFormat(regularPrice, discountPrice) {
         if (regularPrice === null || discountPrice === null) return null;
         return `-${this.percentDiscount(regularPrice, discountPrice).toFixed(1)}%`;
+    }
+
+    /** Takes a search response (no staffPrice yet because of string int conflict) and returns only valid SKUs as a string[] */
+    static extractValidSkus(response = exSearchResponse) {
+        if (!response?.products?.length) return console.log(`Error @ extractValidSkus(): Issue with response: ${response}`);
+        return response.products
+            .filter(product => product.sku.length && product.sku[0] != "B" && product.sku[0] != "M")
+            .map(product => product.sku);
     }
 }
 
@@ -102,7 +115,6 @@ class Table {
         let itemsOnThisPage = this.data.slice(startIndex, startIndex + elementsOnThisPage);
         itemsOnThisPage.forEach(item => this.tBody.append(this.formatRow(item)));
     }
-
 
     static clearAll() {
         this.data = [];
@@ -194,6 +206,7 @@ class Table {
 
     static addHeaders() {
         let row = document.createElement("tr");
+        // The first and last empty strings are for images and remove buttons respectively
         let headers = ["", "Name", "Regular Price", "Staff Price", "Discount (%)", "Discount ($)", ""];
         for (let i in headers) {
             let th = document.createElement("th");
@@ -309,21 +322,17 @@ class Pagination {
 class Progress {
     static progressBarEl;
 
-    /** Percent should be 0-1 */
+    /** Percent should be 0-1. If set to 0, text is blank. */
     static setProgress(percent) {
-        this.progressBarEl.style.width = Math.round(percent * 100) + "%";
+        percentOutOf100 = Math.round(percent * 100) + "%";
+        // this style uses a string like "100%" to work
+        this.progressBarEl.style.width = percentOutOf100;
+        this.progressBarEl.innerText = percent ? percentOutOf100 : "";
     }
 }
 
 // Used for downloading and possibly uploading in the future
 class Loading {
-    static downloadButton;
-
-    static construct(downloadButton) {
-        this.downloadButton = downloadButton;
-        this.downloadButton.onclick = this.download;
-    }
-
     static download() { 
         // Replace this later with formatted data
         const data = "1,2,3\n4,5,6";
@@ -394,10 +403,93 @@ class Search {
     
     static searchInProgress = false;
 
-    static async search(id, query) {
+    /** Starts a normal search, formatting and adding entries to data, then rendering them in the table */
+    static async startNormalSearch(id, query) {
+        let firstResponse = await this.productSearch(id, 1, query);
+        console.log("First Response:", firstResponse);
+        let totalPages = firstResponse.totalPages;
+        let pagesLeft = totalPages;
+        if (pagesLeft >= 300) return alert("Search has been cancelled because it would load >300 pages.");
 
+        // Clear the previous pagination bar
+        Pagination.clear();
+        // Clear the table
+        Table.clearAll();
+        // Set the progress to a small amount to indicate search started
+        Progress.setProgress(0.02);
+
+        // Loop over all pages
+        for (let page = 1; page <= totalPages; page++) {
+            get(links.search(id, page, query)).then(processSearchResponse);
+        }
     }
 
+    /** Requests both a product search and a staffPrice search, returns a combined object */
+    static async combinedSearch(id, pageNumber, query) {
+        // Get the search response
+        let searchResponse = await this.productSearch(id, pageNumber, query);
+        
+        // Return error if it's nullish
+        if (!searchResponse) return console.log("Error @ combinedSearchToData(): Search response failed and returned null");
+        
+        // Extract SKUs
+        let skus = H.extractValidSkus(searchResponse);
+
+        if (!skus.length) return console.log("Error @ combinedSearchToData(): Extracted Skus array has length 0");
+
+        // Get staff price response
+        let staffPriceResponse = await this.staffPriceSearch(skus);
+
+        return {
+            search: searchResponse,
+            staffPrice: staffPriceResponse
+        }
+    }
+
+    /** Requests a product search with target category `id`, `query`, and `pageNumber` and returns the response  */
+    static async productSearch(id, pageNumber, query) {
+        return await get(links.search(id, pageNumber, query));
+    }
+
+    /** Requests a staff price search with array of `skus` (string and/or number) and returns the response */
+    static async staffPriceSearch(skus) {
+        return await get(links.staffPrice(skus));
+    }
+
+    // Get the first response for page count
+    // Get the total page count
+    // For every page:
+        // Get the search response
+        // Extract skus
+        // Get the staff price response
+        // If succeeded, add it
+        // If failed, print something in console
+
+}
+
+// Used for... managing the entire page
+class PageManager {
+    /** Readies the whole page for use, including buttons, progress bar, options, loading functionality, table */
+    static constructPage() {
+        Progress.progressBarEl = document.getElementById("progressBar");
+        Options.construct(document.getElementById("searchOption"), document.getElementById("categoryOption"));
+        Table.construct(document.getElementById("table"));
+        Pagination.construct(document.getElementById("pagination"), document.getElementById("paginationBottom"));
+
+        const searchButton = document.getElementById("searchButton");
+        const searchAllButton = document.getElementById("searchAllButton");
+        const downloadButton = document.getElementById("csvButton");
+        
+        searchButton.onclick = () => {
+            // TODO
+        }
+        searchAllButton.onclick = () => {
+            // TODO
+        }
+        downloadButton.onclick = () => {
+
+        }
+    }
 }
 
 ////////////////////////////////
@@ -405,71 +497,20 @@ class Search {
 ////////////////////////////////
 
 async function start() {
-    const searchButton = document.getElementById("searchButton");
-    const searchAllButton = document.getElementById("searchAllButton");
     
-    Progress.progressBarEl = document.getElementById("progressBar");
-    Options.construct(document.getElementById("searchOption"), document.getElementById("categoryOption"));
-    Loading.construct(document.getElementById("csvButton"));
-    Table.construct(document.getElementById("table"));
-    Pagination.construct(document.getElementById("pagination"), document.getElementById("paginationBottom"));
-
-    searchButton.onclick = () => {
-        search(Options.currentID, Options.searchQuery);
-    }
-    searchAllButton.onclick = () => {
-        console.log();
-    }
-    
-
-    
+    PageManager.constructPage();
 
     async function search(id, query) {
-        let firstResponse = await get(links.search(id, 1, query));
-        console.log("First Response:", firstResponse);
-        let totalPages = firstResponse.totalPages;
-        let pagesLeft = totalPages;
-        if (pagesLeft >= 300) return alert("Search has been cancelled because it would load >300 pages.");
+
+
         
-        Pagination.clear();
-        Table.clearAll();
-        Progress.setProgress(0.02);
-
-        // Loop over all pages
-        for (let page = 1; page <= totalPages; page++) {
-            get(links.search(id, page, query)).then(processSearchResponse);
-        }
-
-        async function processSearchResponse(searchResponse = exSearchResponse) {
-            let staffPrice = await getStaffPrice();
-            pushToData(searchResponse, staffPrice);
-            pagesLeft--;
-            updateProgress();
-            
-            function extractValidSkus(response = exSearchResponse) {
-                return response.products
-                    .filter(product => product.sku.length && product.sku[0] != "B")
-                    .map(product => product.sku);
-            }
-
-            
-
-            function updateProgress() {
-                console.log(`Loading page ${searchResponse.currentPage}/${totalPages}. ${pagesLeft} remaining.`);
-                if (pagesLeft <= 0) {
-                    Table.render(1);
-                    searchInProgress = false;
-                };
-                Progress.setProgress(pagesLeft > 0 ? (totalPages - pagesLeft)/totalPages : 0);
-            }
-        }
 
         function pushToData(searchResponse, staffPriceResponse) {
             let products = searchResponse.products;
-            let detailList = staffPriceResponse ? staffPriceResponse.staffPriceDetailList : null;
+            let detailList = staffPriceResponse?.staffPriceDetailList;
 
             products.forEach(product => {
-                let detail = detailList ? detailList.find(s => s.sku == sku) : null;
+                let detail = detailList?.find(s => s.sku == sku);
                 let staffPrice = (detail && detail.spAllowed != "Y") ? Math.round(detail.staffPrice) : Math.round(product.salePrice);
                 let itemObject = {
                     name: product.name,
@@ -483,6 +524,10 @@ async function start() {
             });
         }
     }
+
+}
+
+function test() {
 
 }
 
@@ -506,24 +551,9 @@ async function start() {
 
 
 
-
-
-
-
-
 ////////////////////////////////
-// Random Helpers
+// Random Stuff
 ////////////////////////////////
-
-
-
-
-
-
-
-
-
-
 
 let exSearchProducts = [
     {
