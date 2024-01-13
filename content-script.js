@@ -33,50 +33,61 @@ const links = {
  * @returns {Promise<JSON | null>} - Response as JSON object or null
  */
 async function get(url) {
-    return await fetch(url).then(r => r.json(), err => {console.log(err); return null});
+    return await fetch(url).then(r => r.json(), err => { console.log("Error @ get(): ", err); return null });
 }
 
 // Helpers
 class H {
     /** Converts a number `n` into CAD currency string */
     static toCAD(n) {
+        if (typeof n != "number") return console.error("Error @ toCAD(): input is " + n + " of type " + typeof n);
         return Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'USD'
         }).format(n);
     }
 
+    static toPercent(n = 0) {
+        if (typeof n != "number") {
+            console.error("Error @ toPercent: input number was not a number. n == " + n);
+            return `toPercent() fail`;
+        }
+        return `-${n.toFixed(1)}%`;
+    }
+
     /** Trims `name` to some `length` with `...` appended afterwards */
     static trimName(name = "", length) {
-        if (name.length > length)
-            return name.substring(0, length) + "...";
+        if (typeof name != "string") return console.error("Error @ trimName(): input name is not a string: " + name);
+        if (typeof length != "number") return console.error("Error @ trimName(): input length is not a number: " + length);
+        if (name.length > length) return name.substring(0, length) + "...";
         return name;
     }
 
     /** Gives the % discount between `regularPrice` and `discountPrice` as a number (0-100) */
     static percentDiscount(regularPrice = 0, discountPrice = 0) {
-        if (!(regularPrice && discountPrice)) return 0;
+        if (typeof regularPrice != "number") return console.error("Error @ percentDiscount(): regularPrice is not a number: " + regularPrice);
+        if (typeof discountPrice != "number") return console.error("Error @ percentDiscount(): discountPrice is not a number: " + discountPrice);
+        if (!regularPrice) return 0;
         return (regularPrice - discountPrice) / regularPrice * 100;
-    }
-    
-    /** Gives the % discount between `regularPrice` and `discountPrice` as a formatted string (`"-x.x%"`) */
-    static percentDiscountFormat(regularPrice, discountPrice) {
-        if (regularPrice === null || discountPrice === null) return null;
-        return `-${this.percentDiscount(regularPrice, discountPrice).toFixed(1)}%`;
     }
 
     /** Takes a search response (no staffPrice yet because of string int conflict) and returns only valid SKUs as a string[] */
     static extractValidSkus(response = exSearchResponse) {
         if (!response?.products?.length) return console.log(`Error @ extractValidSkus(): Issue with response: ${response}`);
         return response.products
-            .filter(product => product.sku.length && product.sku[0] != "B" && product.sku[0] != "M")
+            .filter(product => H.isValidSku(product.sku))
             .map(product => product.sku);
+    }
+
+    /** Checks if `sku` is valid and returns a bool */
+    static isValidSku(sku) {
+        return sku && (sku[0] != "B") && (sku[0] != "M");
     }
 }
 
 // Used for storing and mutating data array
 class Data {
-    /** @type {exItemObject} */
+    /** @type {exItemObject[]} */
     static array = [];
 
     /** 
@@ -84,7 +95,7 @@ class Data {
      * @param {exItemObject} itemObject
      */
     static addItem(itemObject) {
-        this.array.push(itemObject);
+        Data.array.push(itemObject);
     }
 
 }
@@ -95,39 +106,51 @@ class Table {
     static tBody;
     static tHead;
 
+    /** Constructs the table */
     static construct(table = new HTMLTableElement()) {
         this.tBody = table.tBodies.item(0);
         this.tHead = table.tHead;
         this.addHeaders();
     }
 
-    static render(page) {
+    /** Renders page `pageNumber` of the table */
+    static render(pageNumber = 1) {
         this.clearBody();
 
         let totalPages = Math.ceil(Data.array.length / 100);
-        if (page > totalPages) return console.error("Invalid page number: " + page);
-        if (totalPages == 0) return console.log("No data to load");
+        if (totalPages == 0) {
+            console.error("Err @ Table.render(): No data to load");
+            return Table.clearBody();
+        }
+        if (pageNumber > totalPages) {
+            console.error("Err @ Table.render(): Invalid page number: " + pageNumber);
+            return Table.render();
+        }
 
-        Pagination.render(page, totalPages);
+        Pagination.render(pageNumber, totalPages);
 
         // Render the first 100 elements of this page
-        let elementsOnThisPage = (Data.array.length < page * 100) ? Data.array.length - (page - 1) * 100 : 100;
-        let startIndex = (page - 1) * 100;
+        let elementsOnThisPage = (Data.array.length < pageNumber * 100) ? Data.array.length - (pageNumber - 1) * 100 : 100;
+        let startIndex = (pageNumber - 1) * 100;
         let itemsOnThisPage = Data.array.slice(startIndex, startIndex + elementsOnThisPage);
         itemsOnThisPage.forEach(item => this.tBody.append(this.formatRow(item)));
     }
 
+    /** Clears the data array, sort index, table body, and pagination */
     static clearAll() {
         Data.array = [];
         this.curSortIndex = 0;
         this.clearBody();
+        Pagination.clear();
     }
 
+    /** Clears the body of the table and pagination */
     static clearBody() {
         this.tBody.innerHTML = "";
+        Pagination.clear();
     }
 
-    static formatRow(item) {
+    static formatRow(item = exItemObject) {
         let row = document.createElement("tr");
         // Image cell
         let imageCell = document.createElement("td");
@@ -140,7 +163,7 @@ class Table {
         let nameLink = document.createElement("a");
         nameLink.href = item.url;
         nameLink.target = "_blank";
-        nameLink.innerText = trimName(item.name, 80);
+        nameLink.innerText = H.trimName(item.name, 80);
         nameCell.append(nameLink);
         // Regular price cell
         let regularPriceCell = document.createElement("td");
@@ -150,18 +173,19 @@ class Table {
         staffPriceCell.innerText = H.toCAD(item.staffPrice);
         // Percent discount cell
         let percentDiscountCell = document.createElement("td");
-        let pDisc = H.percentDiscountFormat(item.regularPrice, item.staffPrice);
-        percentDiscountCell.innerText = item.staffPrice ? pDisc : "N/A";
+        let pDisc = H.toPercent(item.percentDiscount);
+        percentDiscountCell.innerText = pDisc;
         // Flat discount cell
         let flatDiscountCell = document.createElement("td");
-        flatDiscountCell.innerText = item.staffPrice ? H.toCAD(item.regularPrice - item.staffPrice) : "N/A";
+        flatDiscountCell.innerText = H.toCAD(item.flatDiscount);
+        
         // Delete button
-        let deleteButtonCell = document.createElement("td");
-        let deleteButton = document.createElement("button");
-        deleteButtonCell.append(deleteButton);
-        deleteButton.innerText = "X";
-        deleteButton.className = "btn btn-danger";
-        deleteButton.onclick = (ev) => { this.tBody.removeChild(ev.target.parentNode.parentNode) };
+        // let deleteButtonCell = document.createElement("td");
+        // let deleteButton = document.createElement("button");
+        // deleteButtonCell.append(deleteButton);
+        // deleteButton.innerText = "X";
+        // deleteButton.className = "btn btn-danger";
+        // deleteButton.onclick = (ev) => { this.tBody.removeChild(ev.target.parentNode.parentNode) };
 
         row.append(
             imageCell,
@@ -169,8 +193,8 @@ class Table {
             regularPriceCell,
             staffPriceCell,
             percentDiscountCell,
-            flatDiscountCell,
-            deleteButtonCell
+            flatDiscountCell
+            // deleteButtonCell
         );
 
         return row;
@@ -178,37 +202,21 @@ class Table {
 
     static sort(index) {
         // Nothing needs to be sorted
-        if (index == this.curSortIndex) return;
+        if (index == this.curSortIndex || index < 2 || index > 5) return;
+        this.curSortIndex = index;
         console.log("Sorting table by index: " + index);
-        // Regular Price
-        if (index == 2) {
-            this.curSortIndex = 2;
-            Data.array.sort((a, b) => b.regularPrice - a.regularPrice);
-        }
-        // Staff Price
-        else if (index == 3) {
-            this.curSortIndex = 3;
-            Data.array.sort((a, b) => b.staffPrice - a.staffPrice);
-        }
-        // Discount (%)
-        else if (index == 4) {
-            this.curSortIndex = 4;
-            Data.array.sort((a, b) => H.percentDiscount(b.regularPrice, b.staffPrice) - H.percentDiscount(a.regularPrice, a.staffPrice));
-        }
-        // Discount ($)
-        else if (index == 5) {
-            this.curSortIndex = 5;
-            Data.array.sort((a, b) => (b.regularPrice - b.staffPrice) - (a.regularPrice - a.staffPrice));
-        }
-        else return;
-        console.log(Data.array);
-        this.render(1);
+
+        if (index == 2) Data.array.sort((a, b) => b.regularPrice - a.regularPrice); // Regular Price
+        if (index == 3) Data.array.sort((a, b) => b.staffPrice - a.staffPrice); // Staff Price
+        if (index == 4) Data.array.sort((a, b) => b.percentDiscount - a.percentDiscount); // Discount (percent)
+        if (index == 5) Data.array.sort((a, b) => b.flatDiscount - a.flatDiscount); // Discount (flat)
+        this.render();
     }
 
     static addHeaders() {
         let row = document.createElement("tr");
-        // The first and last empty strings are for images and remove buttons respectively
-        let headers = ["", "Name", "Regular Price", "Staff Price", "Discount (%)", "Discount ($)", ""];
+        // The first and last empty strings are for images and remove buttons respectively (Add an empty string at the end for delete)
+        let headers = ["", "Name", "Regular Price", "Staff Price", "Discount (%)", "Discount ($)"];
         for (let i in headers) {
             let th = document.createElement("th");
             th.innerText = headers[i];
@@ -325,7 +333,7 @@ class Progress {
 
     /** Percent should be 0-1. If set to 0, text is blank. */
     static setProgress(percent) {
-        percentOutOf100 = Math.round(percent * 100) + "%";
+        let percentOutOf100 = Math.round(percent * 100) + "%";
         // this style uses a string like "100%" to work
         this.progressBarEl.style.width = percentOutOf100;
         this.progressBarEl.innerText = percent ? percentOutOf100 : "";
@@ -336,13 +344,15 @@ class Progress {
 class Loading {
     static download() { 
         // Replace this later with formatted data
-        const data = "1,2,3\n4,5,6";
+        const data = Data.array
+            .map((i) => [i.name, i.sku, i.img, i.url, i.regularPrice, i.salePrice, i.percentDiscount, i.flatDiscount].join(","))
+            .join("\n");
         const blob = new Blob([data], { type: 'text/csv' }); 
-        const url = window.URL.createObjectURL(blob) 
-        const a = document.createElement('a') 
-        a.setAttribute('href', url) 
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('href', url);
         a.setAttribute('download', 'download.csv');
-        a.click() 
+        a.click();
     }
 }
 
@@ -403,49 +413,57 @@ class Options {
 class Search {
     
     static searchInProgress = false;
+    static pagesLeft = 0;
 
     /** TODO: Starts a normal search, formatting and adding entries to data, then rendering them in the table */
-    static async startNormalSearch(id, query) {
-        this.searchInProgress = true;
-        let firstResponse = await this.productSearch(id, 1, query);
+    static async startNormalSearch() {
+        const id = Options.currentID;
+        const query = Options.searchQuery;
+        if (Search.searchInProgress) return alert("Search is already in progress. Please wait or refresh the page.");
+        Search.searchInProgress = true;
+        
+        let firstResponse = await Search.productSearch(id, 1, query);
+        if (!firstResponse) {
+            Search.terminateSearch();
+            return console.error("Error @ startNormalSearch: firstResponse failed, returned: ", firstResponse);
+        }
         console.log("First Response:", firstResponse);
+        
         let totalPages = firstResponse.totalPages;
-        let pagesLeft = totalPages;
-        if (pagesLeft >= 300) return alert("Search has been cancelled because it would load >300 pages.");
+        Search.pagesLeft = totalPages;
+        if (Search.pagesLeft >= 300) {
+            Search.terminateSearch();
+            return alert("Search has been cancelled because it would load >300 pages. This could result in a temporary supension.");
+        }
 
-        // Clear the previous pagination bar
+        // Clear the previous pagination bar, table, and start progress
         Pagination.clear();
-        // Clear the table
         Table.clearAll();
-        // Set the progress to a small amount to indicate search started
         Progress.setProgress(0.02);
 
         // Loop over all pages
         for (let page = 1; page <= totalPages; page++) {
+            if (!Search.searchInProgress) return;
             // Do the combined search
-            this.combinedSearch(id, page, query).then(
-                r => this.pushToData(r.search, r.staffPrice),
-                () => console.error("Error @ combinedSearch(): combinedSearch() failed")
-            );
+            Search.combinedSearch(id, page, query).then(Search.onSearchSuccess, Search.onSearchFail);
         }
-        this.searchInProgress = false;
     }
 
     /** Requests both a product search and a staffPrice search, returns a combined object */
     static async combinedSearch(id, pageNumber, query) {
         // Get the search response
-        let searchResponse = await this.productSearch(id, pageNumber, query);
+        let searchResponse = await Search.productSearch(id, pageNumber, query);
         
         // Return error if it's nullish
-        if (!searchResponse) return console.error("Error @ combinedSearch(): Search response failed and returned null");
+        if (!searchResponse) {
+            return console.error("Error @ combinedSearch(): Search response failed and returned null");
+        } 
         
         // Extract SKUs
         let skus = H.extractValidSkus(searchResponse);
 
-        if (!skus.length) return console.error("Error @ combinedSearch(): Extracted Skus array has length 0");
-
         // Get staff price response
-        let staffPriceResponse = await this.staffPriceSearch(skus);
+        let staffPriceResponse = await Search.staffPriceSearch(skus);
 
         return {
             search: searchResponse,
@@ -453,12 +471,28 @@ class Search {
         }
     }
 
-    /** Requests a product search with target category `id`, `query`, and `pageNumber` and returns the response  */
+    static onSearchSuccess(response = {search: exSearchResponse, staffPrice: exStaffPriceResponse}) {
+        Search.pagesLeft--;
+        Search.pushToData(response.search, response.staffPrice);
+        if (Search.pagesLeft <= 0) Search.terminateSearch();
+    }
+
+    static onSearchFail(reason) {
+        Search.pagesLeft--;
+        console.error("Error @ onSearchFail(): Search failed. Reason: ", reason);
+        if (Search.pagesLeft <= 0) Search.terminateSearch();
+    }
+
+    /** Requests a product search with target category `id`, `query`, and `pageNumber` and returns the response 
+     * @returns {Promise<exSearchResponse | null>}
+     */
     static async productSearch(id, pageNumber, query) {
         return await get(links.search(id, pageNumber, query));
     }
 
-    /** Requests a staff price search with array of `skus` (string and/or number) and returns the response */
+    /** Requests a staff price search with array of `skus` (string and/or number) and returns the response 
+     * @returns {Promise<exStaffPriceResponse | null>}
+     */
     static async staffPriceSearch(skus) {
         return await get(links.staffPrice(skus));
     }
@@ -496,6 +530,12 @@ class Search {
         });
     }
 
+    /** Stop the search, render table and all that */
+    static terminateSearch() {
+        Progress.setProgress(0);
+        Table.render(1);
+        Search.searchInProgress = false;
+    }
 }
 
 // Used for... managing the entire page
@@ -511,15 +551,11 @@ class PageManager {
         const searchAllButton = document.getElementById("searchAllButton");
         const downloadButton = document.getElementById("csvButton");
         
-        searchButton.onclick = () => {
-            // TODO
-        }
+        searchButton.onclick = Search.startNormalSearch;
         searchAllButton.onclick = () => {
-            // TODO
+            prompt("TODO");
         }
-        downloadButton.onclick = () => {
-
-        }
+        downloadButton.onclick = () => Loading.download;
     }
 }
 
