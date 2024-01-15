@@ -24,12 +24,6 @@
         img {
             width: 50px;
         }
-        th {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        th:hover {
-            cursor: pointer;
-        }
         ul {
             margin: 0;
         }
@@ -39,6 +33,27 @@
         }
         li:not(.disabled):hover {
             cursor:pointer;
+        }
+        
+        th {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        th:hover {
+            cursor: pointer;
+        }
+
+        tr:nth-child(1) { width: 5%; }
+        tr:nth-child(2) { 
+            text-overflow: ellipsis !important;
+        }
+        tr:nth-child(3) { width: 18%; }
+        tr:nth-child(4) { width: 18%; }
+        tr:nth-child(5) { width: 18%; }
+        tr:nth-child(6) { width: 18%; }
+
+        tr {
+            width: 100%;
+            height: 1px;
         }
     </style>
 </head>
@@ -86,14 +101,22 @@
         <!-- Table -->
         <div class="container">
             <table id="table" class="table">
-                <thead></thead>
-                <tbody></tbody>
+                <thead>
+                    <tr><th></th><th>Name</th><th>Regular Price</th><th>Staff Price</th><th>Discount (%)</th><th>Discount ($)</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td style="padding: 0px;"><img src="https://multimedia.bbycastatic.ca/multimedia/products/150x150/174/17476/17476039.jpg"></td><td><a href="https://bestbuy.ca/en-ca/product/the-warriors-come-out-to-play-board-game-english/17476039" target="_blank">The Warriors: Come Out To Play Board Game - English</a></td><td>$34.98</td><td>$34.98</td><td>-0.0%</td><td>$0.00</td></tr>
+                    <tr><td style="padding: 0px;"><img src="https://multimedia.bbycastatic.ca/multimedia/products/150x150/176/17611/17611664.jpg"></td><td><a href="https://bestbuy.ca/en-ca/product/mattel-barbie-extra-basketball-jersey-doll-accessories/17611664" target="_blank">Mattel Barbie Extra Basketball Jersey Doll &amp; Accessories</a></td><td>$34.98</td><td>$34.98</td><td>-0.0%</td><td>$0.00</td></tr>
+                    <tr><td style="padding: 0px;"><img src="https://multimedia.bbycastatic.ca/multimedia/products/150x150/174/17477/17477314.jpg"></td><td><a href="https://bestbuy.ca/en-ca/product/indiana-jones-sands-of-adventure-board-game-english/17477314" target="_blank">Indiana Jones: Sands of Adventure Board Game - EnglishEnglishEnglishEnglishEnglishEnglishEnglishEnglishEnglishEnglishEnglishEnglishEnglish</a></td><td>$34.98</td><td>$34.98</td><td>-0.0%</td><td>$0.00</td></tr>
+                </tbody>
             </table>
         </div>
 
         <!-- Pagination Bot -->
         <nav class="container">
-            <ul id="paginationBottom" class="pagination"></ul>
+            <ul class="pagination" id="paginationBottom">
+                <li class="page-item"><a class="page-link user-select-none">&lt;&lt;</a></li><li class="page-item"><a class="page-link user-select-none">&lt;</a></li><li class="page-item"><a class="page-link user-select-none">1</a></li><li class="page-item"><a class="page-link user-select-none">2</a></li><li class="page-item active"><a class="page-link user-select-none">3</a></li><li class="page-item"><a class="page-link user-select-none">4</a></li><li class="page-item"><a class="page-link user-select-none">5</a></li><li class="page-item"><a class="page-link user-select-none">6</a></li><li class="page-item"><a class="page-link user-select-none">7</a></li><li class="page-item"><a class="page-link user-select-none">8</a></li><li class="page-item"><a class="page-link user-select-none">9</a></li><li class="page-item"><a class="page-link user-select-none">10</a></li><li class="page-item"><a class="page-link user-select-none">11</a></li><li class="page-item"><a class="page-link user-select-none">&gt;</a></li><li class="page-item"><a class="page-link user-select-none">&gt;&gt;</a></li>
+            </ul>
         </nav>
 
     </div>

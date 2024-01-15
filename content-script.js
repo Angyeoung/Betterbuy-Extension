@@ -422,19 +422,37 @@ class Search {
         if (Search.searchInProgress) return alert("Search is already in progress. Please wait or refresh the page.");
         Search.searchInProgress = true;
         
-        let firstResponse = await Search.productSearch(id, 1, query);
-        if (!firstResponse) {
-            Search.terminateSearch();
-            return console.error("Error @ startNormalSearch: firstResponse failed, returned: ", firstResponse);
-        }
-        console.log("First Response:", firstResponse);
+        let { totalPages } = await Search.verifyFirstResponse(id, query);
+        if (!totalPages) return;
         
-        let totalPages = firstResponse.totalPages;
         Search.pagesLeft = totalPages;
-        if (Search.pagesLeft >= 300) {
-            Search.terminateSearch();
-            return alert("Search has been cancelled because it would load >300 pages. This could result in a temporary supension.");
+        if (!Search.verifyPageCount(totalPages)) return;
+        
+        // Clear the previous pagination bar, table, and start progress
+        Pagination.clear();
+        Table.clearAll();
+        Progress.setProgress(0.02);
+
+        // Loop over all pages
+        for (let page = 1; page <= totalPages; page++) {
+            if (!Search.searchInProgress) return;
+            // Do the combined searches in series
+            Search.combinedSearch(id, page, query).then(Search.onSearchSuccess, Search.onSearchFail);
         }
+    }
+
+    static async startSlowSearch() {
+        const id = Options.currentID;
+        const query = Options.searchQuery;
+        if (Search.searchInProgress) return alert("Search is already in progress. Please wait or refresh the page.");
+        Search.searchInProgress = true;
+        
+        let { totalPages } = await Search.verifyFirstResponse(id, query);
+        if (!totalPages) return;
+        Search.pagesLeft = totalPages;
+        
+        if (!confirm(`This will start a really slow search on ${totalPages} pages. Are you sure?`)) 
+            return console.warn("Warning @ startSlowSearch(): Search manually cancelled.");
 
         // Clear the previous pagination bar, table, and start progress
         Pagination.clear();
@@ -444,9 +462,28 @@ class Search {
         // Loop over all pages
         for (let page = 1; page <= totalPages; page++) {
             if (!Search.searchInProgress) return;
-            // Do the combined search
-            Search.combinedSearch(id, page, query).then(Search.onSearchSuccess, Search.onSearchFail);
+            // Do the combined search in sequence
+            await Search.combinedSearch(id, page, query).then(Search.onSearchSuccess, Search.onSearchFail);
         }
+    }
+
+    static async verifyFirstResponse(id, query) {
+        let firstResponse = await Search.productSearch(id, 1, query);
+        console.log("First Response:", firstResponse);
+        if (!firstResponse) {
+            Search.terminateSearch();
+            return console.error("Error @ startNormalSearch: firstResponse failed, returned: ", firstResponse);
+        }
+        return firstResponse;
+    }
+
+    static verifyPageCount(pageCount) {
+        if (pageCount >= 300) {
+            Search.terminateSearch();
+            alert("Search has been cancelled because it would load >300 pages. This could result in a temporary supension. Use slow search instead.");
+            return false;
+        }
+        return true;
     }
 
     /** Requests both a product search and a staffPrice search, returns a combined object */
@@ -552,9 +589,7 @@ class PageManager {
         const downloadButton = document.getElementById("csvButton");
         
         searchButton.onclick = Search.startNormalSearch;
-        searchAllButton.onclick = () => {
-            prompt("TODO");
-        }
+        searchAllButton.onclick = Search.startSlowSearch;
         downloadButton.onclick = () => Loading.download;
     }
 }
