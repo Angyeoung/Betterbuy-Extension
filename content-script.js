@@ -543,12 +543,12 @@ class Search {
         let detailList = staffPriceResponse?.staffPriceDetailList;
 
         products.forEach(product => {
-            const name = product.name;
-            const staffPrice = product.salePrice;
-            const percentDiscount = 0;
-            const flatDiscount = 0;
+            let name = product.name;
+            let staffPrice = product.salePrice;
+            let percentDiscount = 0;
+            let flatDiscount = 0;
             if (detailList) {
-                const detail = detailList.find(s => s.sku == product.sku);
+                let detail = detailList.find(s => s.sku == product.sku);
                 staffPrice = (detail.spAllowed == "Y") ? detail.staffPrice : product.salePrice;
                 percentDiscount = H.percentDiscount(product.salePrice, staffPrice);
                 flatDiscount = product.salePrice - staffPrice;
