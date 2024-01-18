@@ -547,8 +547,8 @@ class Search {
             let staffPrice = product.salePrice;
             let percentDiscount = 0;
             let flatDiscount = 0;
-            if (detailList) {
-                let detail = detailList.find(s => s.sku == product.sku);
+            let detail = detailList ? detailList.find(s => s.sku == product.sku) : null;
+            if (detail) {
                 staffPrice = (detail.spAllowed == "Y") ? detail.staffPrice : product.salePrice;
                 percentDiscount = H.percentDiscount(product.salePrice, staffPrice);
                 flatDiscount = product.salePrice - staffPrice;
