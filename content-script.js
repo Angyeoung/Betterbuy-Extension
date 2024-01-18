@@ -342,12 +342,11 @@ class Progress {
 
 // Used for downloading and possibly uploading in the future
 class Loading {
-    static download() { 
-        // Replace this later with formatted data
-        const data = Data.array
-            .map((i) => [i.name, i.sku, i.img, i.url, i.regularPrice, i.salePrice, i.percentDiscount, i.flatDiscount].join(","))
-            .join("\n");
-        const blob = new Blob([data], { type: 'text/csv' }); 
+    static download() {
+        const headers = "Name,Sku,Regular Price,Staff Price,Discount (%),Discount ($)\n";
+        const items = Data.array
+            .map((i) => [i.name, i.sku, i.regularPrice, i.staffPrice, i.percentDiscount, i.flatDiscount].join(",").concat("\n"));
+        const blob = new Blob([headers, ...items], { type: 'text/csv' }); 
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.setAttribute('href', url);
@@ -415,7 +414,7 @@ class Search {
     static searchInProgress = false;
     static pagesLeft = 0;
 
-    /** TODO: Starts a normal search, formatting and adding entries to data, then rendering them in the table */
+    /** Starts a normal search, formatting and adding entries to data, then rendering them in the table */
     static async startNormalSearch() {
         const id = Options.currentID;
         const query = Options.searchQuery;
@@ -452,12 +451,12 @@ class Search {
         Search.pagesLeft = totalPages;
         
         if (!confirm(`This will start a really slow search on ${totalPages} pages. Are you sure?`)) 
-            return console.warn("Warning @ startSlowSearch(): Search manually cancelled.");
+            return console.log("Log @ startSlowSearch(): Search manually cancelled.");
 
         // Clear the previous pagination bar, table, and start progress
         Pagination.clear();
         Table.clearAll();
-        Progress.setProgress(0.02);
+        Progress.setProgress(0.01);
 
         // Loop over all pages
         for (let page = 1; page <= totalPages; page++) {
@@ -511,13 +510,14 @@ class Search {
     static onSearchSuccess(response = {search: exSearchResponse, staffPrice: exStaffPriceResponse}) {
         Search.pagesLeft--;
         Search.pushToData(response.search, response.staffPrice);
-        if (Search.pagesLeft <= 0) Search.terminateSearch();
+        if (Search.pagesLeft <= 0) return Search.terminateSearch();
+        Progress.setProgress(response.search.totalPages / Search.pagesLeft);
     }
 
     static onSearchFail(reason) {
         Search.pagesLeft--;
         console.error("Error @ onSearchFail(): Search failed. Reason: ", reason);
-        if (Search.pagesLeft <= 0) Search.terminateSearch();
+        if (Search.pagesLeft <= 0) return Search.terminateSearch();
     }
 
     /** Requests a product search with target category `id`, `query`, and `pageNumber` and returns the response 
@@ -537,7 +537,7 @@ class Search {
     /** Takes a searchResponse and staffPriceResponse, formats it, and pushes it to data */
     static pushToData(searchResponse = exSearchResponse, staffPriceResponse = exStaffPriceResponse) {
         if (!searchResponse) return console.error("Error @ pushToData(): searchResponse failed");
-        if (!staffPriceResponse) console.warn("Warning @ pushToData(): Staff price response failed for searchResponse:", searchResponse);
+        if (!staffPriceResponse) console.log("Warning @ pushToData(): Staff price response failed for searchResponse:", searchResponse);
         
         let products = searchResponse.products;
         let detailList = staffPriceResponse?.staffPriceDetailList;
@@ -547,7 +547,7 @@ class Search {
             let staffPrice = product.salePrice;
             let percentDiscount = 0;
             let flatDiscount = 0;
-            let detail = detailList ? detailList.find(s => s.sku == product.sku) : null;
+            let detail = detailList ? detailList.find(s => s.sku == product.sku) : undefined;
             if (detail) {
                 staffPrice = (detail.spAllowed == "Y") ? detail.staffPrice : product.salePrice;
                 percentDiscount = H.percentDiscount(product.salePrice, staffPrice);
@@ -590,7 +590,7 @@ class PageManager {
         
         searchButton.onclick = Search.startNormalSearch;
         searchAllButton.onclick = Search.startSlowSearch;
-        downloadButton.onclick = () => Loading.download;
+        downloadButton.onclick = Loading.download;
     }
 }
 
