@@ -11,11 +11,11 @@ COMPLETED:
     [x] Sorting
     [x] Properly filter skus that aren't valid
     [x] Add a remove button
+    [x] Remove the remove button
     [x] Pagination
+    [x] Stop getting banned
 
 TODO:
-    [ ] Regular web page stuff
-    [ ] Stop getting banned
     [ ] Hide useless/sold out stuff (even better if useless staffPrice requests are skipped)
     [ ] Add filters maybe (for subscriptions/memberships or other)
     [?] Add other categories and sub-categories
