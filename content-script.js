@@ -202,6 +202,7 @@ class Table {
 
     static sort(index) {
         // Nothing needs to be sorted
+        if (!Data.array.length) return;
         if (index == this.curSortIndex || index < 2 || index > 5) return;
         this.curSortIndex = index;
         console.log("Sorting table by index: " + index);
@@ -508,10 +509,11 @@ class Search {
     }
 
     static onSearchSuccess(response = {search: exSearchResponse, staffPrice: exStaffPriceResponse}) {
+        console.log(`Page ${response.search.currentPage}`);
         Search.pagesLeft--;
         Search.pushToData(response.search, response.staffPrice);
         if (Search.pagesLeft <= 0) return Search.terminateSearch();
-        Progress.setProgress(response.search.totalPages / Search.pagesLeft);
+        Progress.setProgress(1 - Search.pagesLeft / response.search.totalPages);
     }
 
     static onSearchFail(reason) {
