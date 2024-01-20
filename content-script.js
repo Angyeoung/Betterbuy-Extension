@@ -451,18 +451,26 @@ class Search {
         if (!totalPages) return;
         Search.pagesLeft = totalPages;
         
-        if (!confirm(`This will start a really slow search on ${totalPages} pages. Are you sure?`)) {
+        // Start page
+        let startPage = prompt(`Please enter the starting page [1-${totalPages}]:`, 1);
+        if (startPage < 1 || startPage > totalPages) {
             Search.terminateSearch();
-            return console.log("Log @ startSlowSearch(): Search manually cancelled.");
-        } 
-
+            return prompt("Invalid starting page.");
+        }
+        
+        // End page
+        let endPage = prompt(`Please enter the end page [${startPage}-${totalPages}]:`, startPage);
+        if (endPage < startPage || endPage > totalPages) {
+            Search.terminateSearch();
+            return prompt("Invalid end page.");
+        }
         // Clear the previous pagination bar, table, and start progress
         Pagination.clear();
         Table.clearAll();
         Progress.setProgress(0.01);
 
-        // Loop over all pages
-        for (let page = 1; page <= totalPages; page++) {
+        // Loop over selected pages
+        for (let page = startPage; page <= endPage; page++) {
             if (!Search.searchInProgress) return;
             // Do the combined search in sequence
             await Search.combinedSearch(id, page, query).then(Search.onSearchSuccess, Search.onSearchFail);
