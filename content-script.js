@@ -354,6 +354,16 @@ class Loading {
         a.setAttribute('download', 'download.csv');
         a.click();
     }
+
+    // TODO
+    static upload() {
+        if (Search.searchInProgress) return;
+        let files = document.createElement("input").files;
+        for (let i = 0; i < files.length; i++) {
+            let file = files.item(i);
+            // idk how to read this yet will do some testing
+        }
+    }
 }
 
 // Used for the search bar and category option bar
