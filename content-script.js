@@ -451,8 +451,10 @@ class Search {
         if (!totalPages) return;
         Search.pagesLeft = totalPages;
         
-        if (!confirm(`This will start a really slow search on ${totalPages} pages. Are you sure?`)) 
+        if (!confirm(`This will start a really slow search on ${totalPages} pages. Are you sure?`)) {
+            Search.terminateSearch();
             return console.log("Log @ startSlowSearch(): Search manually cancelled.");
+        } 
 
         // Clear the previous pagination bar, table, and start progress
         Pagination.clear();
