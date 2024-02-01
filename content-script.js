@@ -355,14 +355,20 @@ class Loading {
         a.click();
     }
 
-    // TODO
+    // TODO: Place invis input el into HTML
+    // Also bind a button to onFileUpload
+    /** Opens prompt for  */
     static upload() {
-        if (Search.searchInProgress) return;
-        let files = document.createElement("input").files;
-        for (let i = 0; i < files.length; i++) {
-            let file = files.item(i);
-            // idk how to read this yet will do some testing
-        }
+        // Get the input
+        let input = document.querySelector("input");
+        // Click it
+        input.click();
+    }
+
+    static onFileUpload(e) {
+        /** @type {FileList} */
+        let files = e.target.files;
+        
     }
 }
 
