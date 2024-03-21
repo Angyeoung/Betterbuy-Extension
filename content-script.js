@@ -25,7 +25,18 @@ const links = {
         + `&query=${encodeURIComponent(query)}`
         + `&sortBy=price`
         + `&sortDir=desc`
-    )}
+    )},
+    /** Should return the url to the thumbnail image given the sku */
+    thumbnail(sku) {
+        let skuStr = `${sku}`;
+        let a = skuStr.substring(0, 3);
+        let b = skuStr.substring(0, 5);
+        return `https://multimedia.bbycastatic.ca/multimedia/products/150x150/${a}/${b}/${skuStr}.jpg`;
+    },
+    /** Returns the link to the product url given the sku */
+    product(sku) {
+        return `https://www.bestbuy.ca/en-ca/product/${sku}`;
+    }
 };
 
 /** 
@@ -119,11 +130,11 @@ class Table {
 
         let totalPages = Math.ceil(Data.array.length / 100);
         if (totalPages == 0) {
-            console.error("Err @ Table.render(): No data to load");
+            console.log("Err @ Table.render(): No data to load");
             return Table.clearBody();
         }
         if (pageNumber > totalPages) {
-            console.error("Err @ Table.render(): Invalid page number: " + pageNumber);
+            console.log("Err @ Table.render(): Invalid page number: " + pageNumber);
             return Table.render();
         }
 
@@ -343,10 +354,13 @@ class Progress {
 
 // Used for downloading and possibly uploading in the future
 class Loading {
+
+    input = null;
+
     static download() {
         const headers = "Name,Sku,Regular Price,Staff Price,Discount (%),Discount ($)\n";
         const items = Data.array
-            .map((i) => [i.name, i.sku, i.regularPrice, i.staffPrice, i.percentDiscount, i.flatDiscount].join(",").concat("\n"));
+            .map((i) => [i.name.replace(/,/g, ""), i.sku, i.regularPrice, i.staffPrice, i.percentDiscount, i.flatDiscount].join(",").concat("\n"));
         const blob = new Blob([headers, ...items], { type: 'text/csv' }); 
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -355,21 +369,53 @@ class Loading {
         a.click();
     }
 
-    // TODO: Place invis input el into HTML
-    // Also bind a button to onFileUpload
-    /** Opens prompt for  */
+    /** Opens prompt for uploading stuff */
     static upload() {
-        // Get the input
-        let input = document.querySelector("input");
+        if (!Loading.input) {
+            Loading.input = document.createElement("input");
+            Loading.input.type = "file";
+            Loading.input.multiple = true;
+            Loading.input.addEventListener("change", Loading.onFileChange)
+        }
         // Click it
-        input.click();
+        Loading.input.click();
     }
 
-    static onFileUpload(e) {
-        /** @type {FileList} */
-        let files = e.target.files;
-        
+    /** @param {Event} e */
+    static onFileChange(e) {
+        /** @type {File} */
+        console.log(e.target.files);
+        let reader = new FileReader();
+        reader.onloadend = () => { Loading.addToData(reader.result); }
+        for (let i = 0; i < e.target.files.length; i++) {
+            let file = e.target.files[i];
+            if (!file.name.endsWith(".csv")) { console.log("Uploaded a non-CSV: " + file.name); continue; }
+            console.log(`Reading file: ${file.name}`);
+            reader.readAsText(file);
+        }
     }
+
+    static addToData(result = "") {
+        if (!result) return console.log("Error @ Loading.addToData(): Result is empty: " + result);
+        let items = result.split("\n").map(i => i.replace(/, /g, " "));
+        Table.clearBody();
+        for (let i = 1; i < items.length; i++) {
+            let [name, sku, regularPrice, staffPrice, percentDiscount, flatDiscount] = items[i].split(",");
+            if (!sku) continue;
+            Data.addItem({
+                name,
+                sku,
+                img: links.thumbnail(sku.toLowerCase()),
+                url: links.product(sku.toLowerCase()),
+                regularPrice: Number(regularPrice),
+                staffPrice: Number(staffPrice),
+                percentDiscount: Number(percentDiscount),
+                flatDiscount: Number(flatDiscount)
+            });
+        }
+        Table.render();
+    }
+
 }
 
 // Used for the search bar and category option bar
@@ -611,14 +657,17 @@ class PageManager {
         Options.construct(document.getElementById("searchOption"), document.getElementById("categoryOption"));
         Table.construct(document.getElementById("table"));
         Pagination.construct(document.getElementById("pagination"), document.getElementById("paginationBottom"));
+        Table.render();
 
         const searchButton = document.getElementById("searchButton");
         const searchAllButton = document.getElementById("searchAllButton");
         const downloadButton = document.getElementById("csvButton");
+        const uploadButton = document.getElementById("uploadButton");
         
         searchButton.onclick = Search.startNormalSearch;
         searchAllButton.onclick = Search.startSlowSearch;
         downloadButton.onclick = Loading.download;
+        uploadButton.onclick = Loading.upload;
     }
 }
 
@@ -640,7 +689,7 @@ function test() {
     document.body.prepend(tempButton);
 
     function replace() {
-        const miniHTML = `<!doctypehtml><html data-bs-theme=dark lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Document</title><link crossorigin=anonymous href=https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css integrity=sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN rel=stylesheet><style>body{margin:0;padding:0}#main{display:flex;flex-direction:column;padding-top:20vh;gap:20px;position:relative;height:100%;width:100%}img{width:50px}th{background-color:rgba(255,255,255,.1)}th:hover{cursor:pointer}ul{margin:0}li a{width:45px;text-align:center}li:not(.disabled):hover{cursor:pointer}</style><div id=main><div class="container text-center"id=title><h1>BetterBuy</h1></div><div class="container text-center d-flex"><div class="flex-grow-1 pe-1"><input class=form-control id=searchOption placeholder=Search></div><div class="flex-grow-1 px-1"><select class=form-select id=categoryOption><option selected>All Categories</select></div><div class=ps-1><button class="btn btn-primary"id=searchButton type=button>Search</button> <button class="btn btn-primary"id=searchAllButton type=button>Search All</button> <button class="btn btn-primary"id=csvButton type=button>CSV</button></div></div><div class=container><div class=progress><div class="progress-bar progress-bar-animated progress-bar-striped"id=progressBar style=width:0%></div></div></div><nav class=container><ul class=pagination id=pagination></ul></nav><div class=container><table class=table id=table><thead><tbody></table></div><nav class=container><ul class=pagination id=paginationBottom></ul></nav></div>`;
+        const miniHTML = `<!doctypehtml><html data-bs-theme=dark lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Document</title><link crossorigin=anonymous href=https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css integrity=sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN rel=stylesheet><style>body{margin:0;padding:0}#main{display:flex;flex-direction:column;padding-top:20vh;gap:20px;position:relative;height:100%;width:100%}img{width:50px}ul{margin:0}li a{width:45px;text-align:center}li:not(.disabled):hover{cursor:pointer}th{background-color:rgba(255,255,255,.1)}th:hover{cursor:pointer}tr:nth-child(1){width:5%}tr:nth-child(2){text-overflow:ellipsis!important}tr:nth-child(3){width:18%}tr:nth-child(4){width:18%}tr:nth-child(5){width:18%}tr:nth-child(6){width:18%}tr{width:100%;height:1px}</style><div id=main><div class="container text-center"id=title><h1>BetterBuy</h1></div><div class="container text-center d-flex"><div class="flex-grow-1 pe-1"><input class=form-control id=searchOption placeholder=Search></div><div class="flex-grow-1 px-1"><select class=form-select id=categoryOption><option selected>All Categories</select></div><div class=ps-1><button class="btn btn-primary"id=searchButton type=button>Search</button> <button class="btn btn-primary"id=searchAllButton type=button>Search All</button> <button class="btn btn-primary"id=csvButton type=button>CSV</button> <button class="btn btn-primary"id=uploadButton type=button>Upload</button></div></div><div class=container><div class=progress><div class="progress-bar progress-bar-animated progress-bar-striped"id=progressBar style=width:0%></div></div></div><nav class=container><ul class=pagination id=pagination></ul></nav><div class=container><table class=table id=table><thead><tbody></table></div><nav class=container><ul class=pagination id=paginationBottom><li class=page-item><a class="page-link user-select-none">&lt;&lt;</a><li class=page-item><a class="page-link user-select-none">&lt;</a><li class=page-item><a class="page-link user-select-none">1</a><li class=page-item><a class="page-link user-select-none">2</a><li class="page-item active"><a class="page-link user-select-none">3</a><li class=page-item><a class="page-link user-select-none">4</a><li class=page-item><a class="page-link user-select-none">5</a><li class=page-item><a class="page-link user-select-none">6</a><li class=page-item><a class="page-link user-select-none">7</a><li class=page-item><a class="page-link user-select-none">8</a><li class=page-item><a class="page-link user-select-none">9</a><li class=page-item><a class="page-link user-select-none">10</a><li class=page-item><a class="page-link user-select-none">11</a><li class=page-item><a class="page-link user-select-none">></a><li class=page-item><a class="page-link user-select-none">>></a></ul></nav></div>`;
         document.open();
         document.write(miniHTML);
         PageManager.constructPage();
